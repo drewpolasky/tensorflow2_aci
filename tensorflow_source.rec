@@ -1,0 +1,57 @@
+BootStrap: docker
+From: ubuntu:16.04
+
+
+%post
+    # commands to be executed inside container during bootstrap
+    # add python and install some packages
+    apt-get update -y && apt-get upgrade -y 
+    apt install -y build-essential
+    apt-get install -y git cmake gcc binutils \
+      patch \
+      g++ bzip2 ca-certificates \
+      libglib2.0-0 libxext6 libsm6 libxrender1 \
+      mercurial subversion \
+      libcanberra-gtk* \
+      autoconf wget sed python3-dev python3-pip curl\
+   
+    mkdir -p /storage/home
+    mkdir -p /storage/work
+    mkdir -p /gpfs/scratch
+    mkdir -p /gpfs/group
+    mkdir -p /var/spool/torque
+    
+    # Make symlinks
+    ln -s `which qmake-qt5` /usr/local/bin/qmake
+    ln -s `which moc-qt5` /usr/local/bin/moc
+    ln -s `which rcc-qt5` /usr/local/bin/rcc
+    ln -s `which vim` /usr/local/bin/vi
+
+#build tensorflow from source, because the official 2.0 docker images are on ubuntu18, which gives kernel erros on rhel6, even within the container
+    
+    pip3 install pip six numpy wheel setuptools mock 'future>=0.17.1'
+    pip3 install keras_applications==1.0.6 --no-deps
+    pip3 install keras_preprocessing==1.0.5 --no-deps
+
+#install bazel
+    apt-get install -y pkg-config zip g++ zlib1g-dev unzip python3
+    cd /tmp
+    wget https://github.com/bazelbuild/bazel/releases/download/0.29.0/bazel-0.29.0-installer-linux-x86_64.sh
+    chmod +x bazel-0.29.0-installer-linux-x86_64.sh 
+    ./bazel-0.29.0-installer-linux-x86_64.sh
+
+    apt-get install -y openjdk-8-jdk
+
+    echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
+    curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
+
+    apt-get update -y && apt-get install -y bazel 
+
+#build tensorflow 2.0
+    cd /opt
+    https://github.com/tensorflow/tensorflow.git
+    cd tensorflow
+    git checkout r2.0
+    ./configure
+    bazel build config=v2 //tensorflow/tools/pip_package/:build_pip_package
+
